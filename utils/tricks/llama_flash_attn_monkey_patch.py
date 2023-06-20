@@ -39,32 +39,16 @@ class LlamaAttention(nn.Module):
         if (self.head_dim * num_heads) != self.hidden_size:
             raise ValueError(
                 f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
-                f" and `num_heads`: {num_heads}).")
-        self.q_proj = nn.Linear(
-            hidden_size,
-            num_heads * self.head_dim,
-            bias=False,
-        )
-        self.k_proj = nn.Linear(
-            hidden_size,
-            num_heads * self.head_dim,
-            bias=False,
-        )
-        self.v_proj = nn.Linear(
-            hidden_size,
-            num_heads * self.head_dim,
-            bias=False,
-        )
-        self.o_proj = nn.Linear(
-            num_heads * self.head_dim,
-            hidden_size,
-            bias=False,
-        )
+                f" and `num_heads`: {num_heads})."
+            )
+        self.q_proj = nn.Linear(hidden_size, num_heads * self.head_dim, bias=False)
+        self.k_proj = nn.Linear(hidden_size, num_heads * self.head_dim, bias=False)
+        self.v_proj = nn.Linear(hidden_size, num_heads * self.head_dim, bias=False)
+        self.o_proj = nn.Linear(num_heads * self.head_dim, hidden_size, bias=False)
         self.rotary_emb = LlamaRotaryEmbedding(self.head_dim)
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
-        return tensor.view(bsz, seq_len, self.num_heads,
-                           self.head_dim).transpose(1, 2).contiguous()
+        return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
 
     def forward(
             self,
@@ -74,33 +58,19 @@ class LlamaAttention(nn.Module):
             position_ids: Optional[torch.LongTensor] = None,
             output_attentions: bool = False,
             use_cache: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor],
-               Optional[Tuple[torch.Tensor]]]:
-        """Input shape: Batch x Time x Channel
-
-        attention_mask: [bsz, q_len]
-        """
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
-        query_states = self.q_proj(hidden_states).view(
-            bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states = self.k_proj(hidden_states).view(
-            bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        value_states = self.v_proj(hidden_states).view(
-            bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        # [bsz, q_len, nh, hd]
-        # [bsz, nh, q_len, hd]
+        query_states = self.q_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        key_states = self.k_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        value_states = self.v_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-2]
 
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-        query_states, key_states = apply_rotary_pos_emb(query_states,
-                                                        key_states,
-                                                        cos,
-                                                        sin,
-                                                        position_ids)
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         # [bsz, nh, t, hd]
 
         assert not output_attentions, "output_attentions is not supported"

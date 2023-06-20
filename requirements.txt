@@ -14,5 +14,5 @@ wandb==0.15.3
 tqdm
 xformers
 triton
-flash_attn
+flash-attn
 wandb
