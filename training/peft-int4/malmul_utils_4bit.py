@@ -18,7 +18,7 @@ auto_switch_thd = 8
 debug = False
 faster_mode = 'old_faster'  # set disable to disable it
 valid_faster_mode = ('faster', 'old_faster')
-act_order = False
+act_order = True
 cache_buffer = True
 
 

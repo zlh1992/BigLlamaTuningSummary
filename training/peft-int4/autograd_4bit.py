@@ -4,7 +4,11 @@
 # @Email : zhenglinghan.zlh@antgroup.com
 # @File : autograd_4bit.py
 # @Project : LLM
+import os
+import sys
 
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir)))
 import matmul_utils_4bit as mm4b
 import torch
 import torch.nn as nn
@@ -188,10 +192,11 @@ def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
     return res
 
 
-def load_llama_model_4bit_low_ram(config_path, model_path, groupsize=-1, half=False, device_map="auto", seqlen=2048, is_v1_model=False):
+def load_llama_model_4bit_low_ram(config_path, model_path, groupsize=-1, half=False, device_map="auto", seqlen=2048, is_v1_model=False, max_memory=None):
     import accelerate
     from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
-
+    if max_memory is None:
+        max_memory = {0: '14Gib', 1: '14Gib', 2: '14Gib'}
     print(Style.BRIGHT + Fore.CYAN + "Loading Model ...")
     t0 = time.time()
 
@@ -208,11 +213,11 @@ def load_llama_model_4bit_low_ram(config_path, model_path, groupsize=-1, half=Fa
         model=model,
         checkpoint=model_path,
         device_map=device_map,
-        max_memory={0: '20Gib', 1: '20Gib', 'cpu': '48Gib'},
+        max_memory=max_memory,
         no_split_module_classes=["LlamaDecoderLayer"]
     )
-    print("max_memory:", {0: '23Gib', 1: '23Gib', 'cpu': '48Gib'})
-    model.seqlen = 512  # seqlen
+    print("max_memory:", max_memory)
+    model.seqlen = seqlen  # seqlen
 
     if half:
         model_to_half(model)
@@ -231,7 +236,7 @@ def load_llama_model_4bit_low_ram_and_offload(config_path, model_path, lora_path
     from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
 
     if max_memory is None:
-        max_memory = {0: '18Gib', 1: '18Gib', 'cpu': '48Gib'}
+        max_memory = {0: '15Gib', 1: '15Gib', 2: '15Gib', 3: '15Gib', 'cpu': '48Gib'}
 
     print(Style.BRIGHT + Fore.CYAN + "Loading Model ...")
     t0 = time.time()
@@ -255,9 +260,9 @@ def load_llama_model_4bit_low_ram_and_offload(config_path, model_path, lora_path
 
     if lora_path is not None:
         from peft import PeftModel
-        from monkeypatch.peft_tuners_lora_monkey_patch import Linear4bitLt
-        model = PeftModel.from_pretrained(model, lora_path, device_map={'': 'cpu'}, torch_dtype=torch.float32,
-                                          is_trainable=True)
+        from utils.tricks.peft_tuners_lora_monkey_patch import Linear4bitLt
+        model = PeftModel.from_pretrained(model, lora_path,
+                                          is_trainable=True) # device_map={'': 'cpu'}, torch_dtype=torch.float32,
         print(Style.BRIGHT + Fore.GREEN + '{} Lora Applied.'.format(lora_path))
 
     model.seqlen = seqlen
@@ -304,4 +309,6 @@ def load_llama_model_4bit_low_ram_and_offload(config_path, model_path, lora_path
 
 
 load_llama_model_4bit_low_ram_and_offload_to_cpu = load_llama_model_4bit_low_ram_and_offload
+
+
 
